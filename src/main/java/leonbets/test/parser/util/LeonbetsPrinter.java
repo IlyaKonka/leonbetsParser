@@ -4,6 +4,8 @@ import leonbets.test.parser.entity.Event;
 import leonbets.test.parser.entity.Market;
 import leonbets.test.parser.entity.MarketEnvelope;
 import leonbets.test.parser.entity.Runner;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -19,13 +21,14 @@ import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 
-public record LeonbetsPrinter(
-        String sportName,
-        String regionName,
-        String leagueName,
-        Long leagueId,
-        Event event,
-        MarketEnvelope marketEnvelope) {
+@AllArgsConstructor
+@Data
+public class LeonbetsPrinter {
+    private String sportName;
+    private String regionName;
+    private String leagueName;
+    private Event event;
+    private MarketEnvelope marketEnvelope;
 
     private static final String HEADER_FORMAT = "%s, %s %s%n";
     private static final String EVENT_INFO_FORMAT = "\t%s, %s UTC, %d%n";

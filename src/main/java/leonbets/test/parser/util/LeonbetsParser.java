@@ -104,12 +104,11 @@ public class LeonbetsParser {
                 .map(entry -> {
                     Region region = entry.getKey();
                     League league = entry.getValue();
-                    ParsingContext context = new ParsingContext(sport.name(), region.name(), league);
                     return CompletableFuture.runAsync(() -> {
                         try {
                             semaphore.acquire();
                             try {
-                                processLeague(context);
+                                processLeague(sport.name(), region.name(), league);
                             } finally {
                                 semaphore.release();
                             }
@@ -121,9 +120,9 @@ public class LeonbetsParser {
                 .collect(Collectors.toList());
     }
 
-    private void processLeague(ParsingContext context) {
+    private void processLeague(String sportName, String regionName, League league) {
         try {
-            String url = baseUrl + String.format(eventsEndpoint, context.league().id());
+            String url = baseUrl + String.format(eventsEndpoint, league.id());
             EventEnvelope eventEnvelope = webClient.get()
                     .uri(url)
                     .retrieve()
@@ -132,46 +131,40 @@ public class LeonbetsParser {
 
             if (eventEnvelope == null || CollectionUtils.isEmpty(eventEnvelope.events())) {
                 log.error("No events found for sport='{}', league='{}' with id={}",
-                        context.sport(), context.league().name(), context.league().id());
+                        sportName, league.name(), league.id());
                 return;
             }
 
             eventEnvelope.events().stream()
                     .limit(eventsPerLeague)
-                    .map(event -> context.map(event, null))
+                    .map(event -> new LeonbetsPrinter(sportName, regionName, league.name(), event, null))
                     .forEach(this::processMarket);
 
         } catch (Exception e) {
             log.error("Failed to process league={} with id={} for sport={}: {}",
-                    context.league().name(), context.league().id(), context.sport(), e.getMessage(), e);
+                    league.name(), league.id(), sportName, e.getMessage(), e);
         }
     }
 
-    private void processMarket(LeonbetsPrinter template) {
+    private void processMarket(LeonbetsPrinter printer) {
         try {
-            String url = baseUrl + String.format(marketsEndpoint, template.event().id());
+            String url = baseUrl + String.format(marketsEndpoint, printer.getEvent().id());
             MarketEnvelope marketEnvelope = webClient.get()
                     .uri(url)
                     .retrieve()
                     .bodyToMono(MarketEnvelope.class)
                     .block();
 
-            LeonbetsPrinter finalTemplate = new LeonbetsPrinter(
-                    template.sportName(),
-                    template.regionName(),
-                    template.leagueName(),
-                    template.leagueId(),
-                    template.event(),
-                    marketEnvelope);
+            printer.setMarketEnvelope(marketEnvelope);
 
-            finalTemplate.printToConsole();
-            //finalTemplate.writeToFile(Path.of("leonbets.txt"));
+            printer.printToConsole();
+            //printer.writeToFile(Path.of("leonbets.txt"));
 
         } catch (Exception e) {
             log.error("Failed to process market for eventId={}, league='{}', sport='{}': {}",
-                    template.event().id(),
-                    template.leagueName(),
-                    template.sportName(),
+                    printer.getEvent().id(),
+                    printer.getLeagueName(),
+                    printer.getSportName(),
                     e.getMessage(), e);
         }
     }

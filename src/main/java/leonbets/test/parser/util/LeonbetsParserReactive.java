@@ -61,7 +61,7 @@ public class LeonbetsParserReactive {
                                 .map(sportMap::get)
                                 .filter(Objects::nonNull)
                                 .concatMap(sport -> processSport(sport)
-                                        .subscribeOn(Schedulers.boundedElastic()))
+                                        .subscribeOn(Schedulers.boundedElastic()), maxConcurrentTasks)
                 )
                 .onErrorContinue((e, o) -> log.error("Failed processing object: {}", o, e));
     }
@@ -101,30 +101,23 @@ public class LeonbetsParserReactive {
                                             sportName,
                                             regionName,
                                             league.name(),
-                                            league.id(),
                                             event,
                                             null
                                     )));
                 });
     }
 
-    private Mono<LeonbetsPrinter> processMarket(LeonbetsPrinter template) {
-        String url = baseUrl + String.format(marketsEndpoint, template.event().id());
+    private Mono<LeonbetsPrinter> processMarket(LeonbetsPrinter printer) {
+        String url = baseUrl + String.format(marketsEndpoint, printer.getEvent().id());
 
         return webClient.get()
                 .uri(url)
                 .retrieve()
                 .bodyToMono(MarketEnvelope.class)
-                .map(marketEnvelope -> new LeonbetsPrinter(
-                        template.sportName(),
-                        template.regionName(),
-                        template.leagueName(),
-                        template.leagueId(),
-                        template.event(),
-                        marketEnvelope
-                ))
+                .doOnNext(printer::setMarketEnvelope)
+                .map(marketEnvelope -> printer)
                 .onErrorResume(e -> {
-                    log.error("Failed to fetch market for eventId={}: {}", template.event().id(), e.getMessage());
+                    log.error("Failed to fetch market for eventId={}: {}", printer.getEvent().id(), e.getMessage());
                     return Mono.empty();
                 });
     }
