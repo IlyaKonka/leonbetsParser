@@ -31,7 +31,7 @@ class LeonbetsControllerMockTest {
 
             Event mockEvent = new Event(1970326913799811L, "Team A vs Team B", System.currentTimeMillis());
             LeonbetsPrinter printer = new LeonbetsPrinter(
-                    "Football", "England", "Premier League", 1970326913799814L, mockEvent, new MarketEnvelope(List.of())
+                    "Football", "England", "Premier League", mockEvent, new MarketEnvelope(List.of())
             );
 
             when(mock.parse()).thenReturn(Flux.just(printer));
@@ -53,7 +53,7 @@ class LeonbetsControllerMockTest {
                 .hasSize(1)
                 .value(list -> {
                     LeonbetsPrinter result = list.getFirst();
-                    assert result.sportName().equals("Football");
+                    assert result.getSportName().equals("Football");
                 });
     }
 }

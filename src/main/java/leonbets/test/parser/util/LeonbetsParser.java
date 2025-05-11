@@ -9,9 +9,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -62,8 +62,7 @@ public class LeonbetsParser {
                     .get()
                     .uri(sportsEndpoint)
                     .retrieve()
-                    .bodyToFlux(new ParameterizedTypeReference<Sport>() {
-                    })
+                    .bodyToFlux(new ParameterizedTypeReference<Sport>() {})
                     .collectList()
                     .block();
 
@@ -75,14 +74,16 @@ public class LeonbetsParser {
             Map<String, Sport> sportMap = responseSports.stream()
                     .collect(Collectors.toMap(Sport::name, Function.identity()));
 
-            CompletableFuture.allOf(
-                    chosenSports.stream()
-                            .map(sportMap::get)
-                            .filter(Objects::nonNull)
-                            .flatMap(sport -> processSport(sport, executor, semaphore).stream())
-                            .toArray(CompletableFuture[]::new)
-            ).join();
+            for (String sportName : chosenSports) {
+                Sport sport = sportMap.get(sportName);
+                if (sport == null) {
+                    log.error("Sport '{}' not found in received data", sportName);
+                    continue;
+                }
 
+                List<CompletableFuture<Void>> leagueTasks = processSport(sport, executor, semaphore);
+                CompletableFuture.allOf(leagueTasks.toArray(new CompletableFuture[0])).join();
+            }
         } finally {
             executor.close();
         }

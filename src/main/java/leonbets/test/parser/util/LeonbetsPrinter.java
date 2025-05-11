@@ -17,6 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -30,6 +31,7 @@ public class LeonbetsPrinter {
     private Event event;
     private MarketEnvelope marketEnvelope;
 
+    private static final Map<Path, Object> fileLocks = new ConcurrentHashMap<>();
     private static final String HEADER_FORMAT = "%s, %s %s%n";
     private static final String EVENT_INFO_FORMAT = "\t%s, %s UTC, %d%n";
     private static final String MARKET_NAME_FORMAT = "\t\t%s%n";
@@ -38,24 +40,30 @@ public class LeonbetsPrinter {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("UTC"));
 
     public void printToConsole() {
-        System.out.println(generateFormattedOutput());
+        synchronized (System.out) {
+            System.out.println(generateFormattedOutput());
+        }
     }
 
     public void writeToFile(Path filePath) {
-        try {
-            Files.writeString(
-                    filePath,
-                    generateFormattedOutput() + System.lineSeparator(),
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.APPEND
-            );
-        } catch (IOException ex) {
-            throw new RuntimeException("Could not write to file: " + filePath, ex);
+        Object lock = fileLocks.computeIfAbsent(filePath, p -> new Object());
+        synchronized (lock) {
+            try {
+                Files.writeString(
+                        filePath,
+                        generateFormattedOutput() + System.lineSeparator(),
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.APPEND
+                );
+            } catch (IOException ex) {
+                throw new RuntimeException("Could not write to file: " + filePath, ex);
+            }
         }
     }
 
     private String generateFormattedOutput() {
         return new StringBuilder()
+//                .append("[Thread: ").append(Thread.currentThread()).append("]\n")
                 .append(formatHeader())
                 .append(formatEventDetails())
                 .append(formatMarkets())
