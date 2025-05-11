@@ -60,8 +60,7 @@ public class LeonbetsParserReactive {
                         Flux.fromIterable(chosenSports)
                                 .map(sportMap::get)
                                 .filter(Objects::nonNull)
-                                .concatMap(sport -> processSport(sport)
-                                        .subscribeOn(Schedulers.boundedElastic()), maxConcurrentTasks)
+                                .concatMap(this::processSport)
                 )
                 .onErrorContinue((e, o) -> log.error("Failed processing object: {}", o, e));
     }
@@ -77,7 +76,10 @@ public class LeonbetsParserReactive {
                 .flatMap(region ->
                         Flux.fromIterable(region.leagues())
                                 .filter(League::top)
-                                .flatMap(league -> processLeague(sport.name(), region.name(), league))
+                                .flatMap(
+                                        league -> processLeague(sport.name(), region.name(), league),
+                                        maxConcurrentTasks
+                                )
                 );
     }
 
